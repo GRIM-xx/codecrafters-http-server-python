@@ -1,5 +1,8 @@
 import socket
 import threading
+import os
+
+FILES_DIR = "./files"
 
 def handle_client(connection):
     try:
@@ -41,6 +44,16 @@ def handle_client(connection):
             headers = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n"
             response = headers + body
 
+        elif path.startswith("/files/") and method == "GET":
+            filename = path[len("/files/"):]
+            filepath = os.path.join(FILES_DIR, filename)
+
+            if os.path.isfile(filepath):
+                with open(filepath, "rb") as f:
+                    body = f.read()
+                headers = b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n"
+                response = headers + body
+                
         else:
             response = b"HTTP/1.1 404 Not Found\r\n\r\n"
 
