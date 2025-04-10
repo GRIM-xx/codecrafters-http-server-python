@@ -9,8 +9,30 @@ def main():
     #
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
     # server_socket.accept() # wait for client
-    server_socket.accept()[0].sendall(b"HTTP/1.1 200 OK\r\n\r\n")
 
+    while True:
+        connection, address = server_socket.accept()
+        request = connection.recv(1024).decode("utf-8")
+        print("Received request:")
+        print(request)
+
+        request_line = request.splitlines()[0]
+        parts = request_line.split()
+
+        if len(parts) < 2:
+            connection.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\n")
+            connection.close()
+            continue
+
+        method, path = parts[0], parts[1]
+
+        if path == "/":
+            response = b"HTTP/1.1 200 OK\r\n\r\n"
+        else:
+            response = b"HTTP/1.1 404 Not Found\r\n\r\n"
+
+        connection.sendall(response)
+        connection.close()
 
 if __name__ == "__main__":
     main()
