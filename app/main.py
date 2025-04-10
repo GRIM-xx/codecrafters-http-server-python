@@ -53,7 +53,9 @@ def handle_client(connection):
                     body = f.read()
                 headers = b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n"
                 response = headers + body
-                
+            else:
+                response = b"HTTP/1.1 404 Not Found\r\n\r\n"
+
         else:
             response = b"HTTP/1.1 404 Not Found\r\n\r\n"
 
@@ -63,7 +65,7 @@ def handle_client(connection):
 
 def main():
     print("Starting the server ...")
-
+    
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
 
     while True:
