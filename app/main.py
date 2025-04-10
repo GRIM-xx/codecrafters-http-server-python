@@ -1,8 +1,26 @@
 import socket
 import threading
 import os
+import sys
 
-FILES_DIR = "./files"
+def get_directory():
+    if "--directory" not in sys.argv:
+        print("Error: --directory flag is missing.")
+        sys.exit(1)
+
+    directory_index = sys.argv.index("--directory") + 1
+    if directory_index < len(sys.argv):
+        directory = sys.argv[directory_index]
+        if not os.path.isabs(directory):
+            print("Error: The directory path must be an absolute path.")
+            sys.exit(1)
+        return directory
+    else:
+        print("Error: No directory path provided after --directory.")
+        sys.exit(1)
+
+
+FILES_DIR = get_directory()
 
 def handle_client(connection):
     try:
