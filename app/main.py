@@ -33,6 +33,16 @@ def main():
             body = value.encode()
             headers = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n"
             response = headers + body
+        elif path == "/user-agent":
+            user_agent = ""
+            for line in request_line[1:]:
+                if line.lower().startswith("user-agent"):
+                    user_agent = line[len("User-Agent: "):].strip()
+                    break
+            
+            body = user_agent.encode()
+            headers = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n"
+            response = headers + body
         else:
             response = b"HTTP/1.1 404 Not Found\r\n\r\n"
 
