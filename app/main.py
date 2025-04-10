@@ -16,7 +16,13 @@ def main():
         print("Received request:")
         print(request)
 
-        request_line = request.splitlines()[0]
+        request_lines = request.splitlines()
+        if not request_lines:
+            connection.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\n")
+            connection.close()
+            continue
+
+        request_line = request_lines[0]
         parts = request_line.split()
 
         if len(parts) < 2:
@@ -35,11 +41,11 @@ def main():
             response = headers + body
         elif path == "/user-agent":
             user_agent = ""
-            for line in request_line[1:]:
-                if line.lower().startswith("user-agent"):
+            for line in request_lines[1:]:
+                if line.lower().startswith("user-agent:"):
                     user_agent = line[len("User-Agent:"):].strip()
                     break
-            
+
             body = user_agent.encode()
             headers = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n"
             response = headers + body
