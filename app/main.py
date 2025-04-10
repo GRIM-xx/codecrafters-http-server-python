@@ -37,7 +37,7 @@ def main():
             user_agent = ""
             for line in request_line[1:]:
                 if line.lower().startswith("user-agent"):
-                    user_agent = line[len("User-Agent: "):].strip()
+                    user_agent = line[len("User-Agent:"):].strip()
                     break
             
             body = user_agent.encode()
