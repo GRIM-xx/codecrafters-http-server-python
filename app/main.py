@@ -2,6 +2,16 @@ import socket
 import threading
 import os
 import sys
+import gzip
+import io
+
+def compress_response(body: bytes, encoding: str):
+    if encoding == "gzip":
+        buf = io.BytesIO()
+        with gzip.GzipFile(fileobj=buf, mode='wb') as gzip_file:
+            gzip_file.write(body)
+        return buf.getvalue(), "gzip"
+    return body, None
 
 def handle_client(connection, address):
     try:
@@ -38,6 +48,7 @@ def handle_client(connection, address):
                 key, value = line.split(":", 1)
                 headers[key.strip().lower()] = value.strip()
 
+        accept_encoding = headers.get("accept-encoding", "")
         content_length = int(headers.get("content-length", 0))
 
         while len(body) < content_length:
@@ -46,28 +57,19 @@ def handle_client(connection, address):
                 break
             body += chunk
 
+        response_body = b""
+        content_type = b"text/plain"
+        content_encoding_header = b""
+
         if path == "/":
             response = b"HTTP/1.1 200 OK\r\n\r\n"
 
         elif path.startswith("/echo/"):
             value = path[len("/echo/"):]
             response_body = value.encode()
-            response = (
-                b"HTTP/1.1 200 OK\r\n"
-                b"Content-Type: text/plain\r\n"
-                + b"Content-Length: " + str(len(response_body)).encode() + b"\r\n\r\n"
-                + response_body
-            )
 
         elif path == "/user-agent":
-            user_agent = headers.get("user-agent", "")
-            response_body = user_agent.encode()
-            response = (
-                b"HTTP/1.1 200 OK\r\n"
-                b"Content-Type: text/plain\r\n"
-                + b"Content-Length: " + str(len(response_body)).encode() + b"\r\n\r\n"
-                + response_body
-            )
+            response_body = headers.get("user-agent", "").encode()
 
         elif path.startswith("/files/"):
             directory = sys.argv[2]
@@ -77,30 +79,39 @@ def handle_client(connection, address):
             if method == "GET":
                 if os.path.isfile(filepath):
                     with open(filepath, "rb") as f:
-                        file_data = f.read()
-                    response = (
-                        b"HTTP/1.1 200 OK\r\n"
-                        b"Content-Type: application/octet-stream\r\n"
-                        + b"Content-Length: " + str(len(file_data)).encode() + b"\r\n\r\n"
-                        + file_data
-                    )
+                        response_body = f.read()
+                    content_type = b"application/octet-stream"
                 else:
-                    response = b"HTTP/1.1 404 Not Found\r\n\r\n"
-
+                    connection.sendall(b"HTTP/1.1 404 Not Found\r\n\r\n")
+                    return
             elif method == "POST":
                 try:
                     with open(filepath, "wb") as f:
                         f.write(body)
-                    response = b"HTTP/1.1 201 Created\r\n\r\n"
+                    connection.sendall(b"HTTP/1.1 201 Created\r\n\r\n")
+                    return
                 except Exception:
-                    response = b"HTTP/1.1 500 Internal Server Error\r\n\r\n"
-            else:
-                response = b"HTTP/1.1 405 Method Not Allowed\r\n\r\n"
+                    connection.sendall(b"HTTP/1.1 500 Internal Server Error\r\n\r\n")
+                    return
 
         else:
-            response = b"HTTP/1.1 404 Not Found\r\n\r\n"
+            connection.sendall(b"HTTP/1.1 404 Not Found\r\n\r\n")
+            return
 
-        connection.sendall(response)
+        if "gzip" in accept_encoding.lower():
+            response_body, encoding_used = compress_response(response_body, "gzip")
+            content_encoding_header = b"Content-Encoding: gzip\r\n"
+
+        response_headers = (
+            b"HTTP/1.1 200 OK\r\n"
+            b"Content-Type: " + content_type + b"\r\n"
+            + b"Content-Length: " + str(len(response_body)).encode() + b"\r\n"
+            + content_encoding_header +
+            b"\r\n"
+        )
+
+        connection.sendall(response_headers + response_body)
+
     finally:
         connection.close()
 
