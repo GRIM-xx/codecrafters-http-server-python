@@ -49,15 +49,14 @@ def handle_client(connection, address):
             filepath = os.path.join(directory, filename)
 
             if method == "GET":
-                try:
+                if os.path.isfile(filepath):
                     with open(filepath, "rb") as f:
                         body = f.read()
                     headers = b"HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n"
                     response = headers + body
-                except Exception as e:
-                    print(f"Error reading file {filepath}: {e}")
-                    response = b"HTTP/1.1 500 Internal Server Error\r\n\r\n"
-            
+                else:
+                    response = b"HTTP/1.1 404 Not Found\r\n\r\n"
+
             elif method == "POST":
                 content_length = 0
                 for line in request_lines:
@@ -65,14 +64,14 @@ def handle_client(connection, address):
                         content_length = int(line.split(":")[1].strip())
                         break
 
-                body = request[-content_length:].encode()
-
+                # Read the remaining request body
+                body = connection.recv(content_length)
                 try:
                     with open(filepath, "wb") as f:
                         f.write(body)
                     response = b"HTTP/1.1 201 Created\r\n\r\n"
                 except Exception as e:
-                    print(f"Error creating file: {e}")
+                    print(f"Error writing file {filepath}: {e}")
                     response = b"HTTP/1.1 500 Internal Server Error\r\n\r\n"
 
         else:
