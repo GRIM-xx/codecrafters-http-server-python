@@ -7,11 +7,17 @@ def handle_client(connection, address):
     try:
         request = b""
         while b"\r\n\r\n" not in request:
-            request += connection.recv(1024)
+            chunk = connection.recv(1024)
+            if not chunk:
+                break
+            request += chunk
 
-        request_lines = request.decode("utf-8").split("\r\n")
+        header_part, _, body = request.partition(b"\r\n\r\n")
+        request_lines = header_part.decode("utf-8").split("\r\n")
+
         print("Received request:")
-        print(request.decode("utf-8"))
+        print(header_part.decode("utf-8"))
+        print(body.decode("utf-8", errors="ignore"))
 
         if not request_lines:
             connection.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\n")
@@ -32,11 +38,13 @@ def handle_client(connection, address):
                 key, value = line.split(":", 1)
                 headers[key.strip().lower()] = value.strip()
 
-        body = b""
-        if "content-length" in headers:
-            content_length = int(headers["content-length"])
-            while len(body) < content_length:
-                body += connection.recv(1024)
+        content_length = int(headers.get("content-length", 0))
+
+        while len(body) < content_length:
+            chunk = connection.recv(1024)
+            if not chunk:
+                break
+            body += chunk
 
         if path == "/":
             response = b"HTTP/1.1 200 OK\r\n\r\n"
@@ -67,20 +75,17 @@ def handle_client(connection, address):
             filepath = os.path.join(directory, filename)
 
             if method == "GET":
-                try:
-                    if os.path.isfile(filepath):
-                        with open(filepath, "rb") as f:
-                            file_data = f.read()
-                        response = (
-                            b"HTTP/1.1 200 OK\r\n"
-                            b"Content-Type: application/octet-stream\r\n"
-                            + b"Content-Length: " + str(len(file_data)).encode() + b"\r\n\r\n"
-                            + file_data
-                        )
-                    else:
-                        response = b"HTTP/1.1 404 Not Found\r\n\r\n"
-                except Exception:
-                    response = b"HTTP/1.1 500 Internal Server Error\r\n\r\n"
+                if os.path.isfile(filepath):
+                    with open(filepath, "rb") as f:
+                        file_data = f.read()
+                    response = (
+                        b"HTTP/1.1 200 OK\r\n"
+                        b"Content-Type: application/octet-stream\r\n"
+                        + b"Content-Length: " + str(len(file_data)).encode() + b"\r\n\r\n"
+                        + file_data
+                    )
+                else:
+                    response = b"HTTP/1.1 404 Not Found\r\n\r\n"
 
             elif method == "POST":
                 try:
@@ -101,7 +106,6 @@ def handle_client(connection, address):
 
 def main():
     print("Starting the server ...")
-
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
 
     while True:
