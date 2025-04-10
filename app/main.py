@@ -3,26 +3,7 @@ import threading
 import os
 import sys
 
-def get_directory():
-    if "--directory" not in sys.argv:
-        print("Error: --directory flag is missing.")
-        sys.exit(1)
-
-    directory_index = sys.argv.index("--directory") + 1
-    if directory_index < len(sys.argv):
-        directory = sys.argv[directory_index]
-        if not os.path.isabs(directory):
-            print("Error: The directory path must be an absolute path.")
-            sys.exit(1)
-        return directory
-    else:
-        print("Error: No directory path provided after --directory.")
-        sys.exit(1)
-
-
-FILES_DIR = get_directory()
-
-def handle_client(connection):
+def handle_client(connection, address):
     try:
         request = connection.recv(1024).decode("utf-8")
         print("Received request:")
@@ -63,8 +44,9 @@ def handle_client(connection):
             response = headers + body
 
         elif path.startswith("/files/") and method == "GET":
+            directory = sys.argv[2]
             filename = path[len("/files/"):]
-            filepath = os.path.join(FILES_DIR, filename)
+            filepath = os.path.join(directory, filename)
 
             if os.path.isfile(filepath):
                 with open(filepath, "rb") as f:
@@ -88,7 +70,7 @@ def main():
 
     while True:
         connection, address = server_socket.accept()
-        thread = threading.Thread(target=handle_client, args=(connection,))
+        thread = threading.Thread(target=handle_client, args=(connection, address))
         thread.start()
 
 if __name__ == "__main__":
